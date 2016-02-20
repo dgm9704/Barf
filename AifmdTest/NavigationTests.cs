@@ -3,8 +3,13 @@ namespace Diwen.Aifmd.Tests
 {
     using System.Xml;
 
-    //using Microsoft.VisualStudio.TestTools.UnitTesting;
+    #if __MonoCS__
     using NUnit.Framework;
+
+    #else
+    using Microsoft.VisualStudio.TestTools.UnitTesting;
+    #endif
+
     using System.Xml.Schema;
     using System.IO;
     using System.Linq;
@@ -14,12 +19,19 @@ namespace Diwen.Aifmd.Tests
     using System.Xml.XPath;
     using System.Text.RegularExpressions;
 
-    //[TestClass]
+
+    #if __MonoCS__
     [TestFixture]
+    #else
+    [TestClass]
+    #endif
     public class NavigationTests
     {
-        //[TestMethod]
+        #if __MonoCS__
         [Test]
+        #else
+        [TestMethod]
+        #endif
         public void ReadWriteWithValidationTest()
         {
             var inputPath = Path.Combine("data", "AIFSample.xml");
@@ -45,7 +57,7 @@ namespace Diwen.Aifmd.Tests
 
             DumpCellData(cellData);
 
-            Dictionary<string,string> dataForXml = CreateOutputData(cellData, cellStructure);
+            var dataForXml = CreateOutputData(cellData, cellStructure);
 
             var outputReport = WriteReport(dataForXml);
 
@@ -86,8 +98,7 @@ namespace Diwen.Aifmd.Tests
         public static Dictionary<string, string> CreateOutputData(List<CellDatabaseCell> celldata, List<CellStructureCell> cellStructure)
         {
             var zLookUp = CreateZLookup(celldata);
-            var outputData = AddAxisIndices(celldata, cellStructure, zLookUp);
-            return outputData;
+            return AddAxisIndices(celldata, cellStructure, zLookUp);
         }
 
         public static void DumpCellData(List<CellDatabaseCell> celldata)
@@ -252,10 +263,6 @@ namespace Diwen.Aifmd.Tests
 
                     if ((y ?? "").StartsWith("#"))
                     {
-                        //var keyLength = yResult.Key.Split('.').Length;
-                        //var contextKeyParts = contextKey.Split('.');
-                        //contextKeyParts[keyLength - 1] += "[" + y.TrimStart('#') + "]";
-                        //contextKey = string.Join(".", contextKeyParts);
                         contextKey += "[" + y.TrimStart('#') + "]";
                         rowNumber = 0;
                         y = null;
@@ -278,19 +285,19 @@ namespace Diwen.Aifmd.Tests
         }
 
         public static Dictionary<string, string> AddAxisIndices(
-            List<CellDatabaseCell> data, 
-            List<CellStructureCell> cellstructure, 
+            List<CellDatabaseCell> data,
+            List<CellStructureCell> cellstructure,
             Dictionary<string, string> zLookup)
         {
             var rowKeys = cellstructure.Where(c => c.IsRowKey && string.IsNullOrEmpty(c.DefaultValue)).ToList();
-            var result0 = new Dictionary<string, string>();
-            var result1 = new Dictionary<string, string>();
-            var result2 = new Dictionary<string, string>();
+            var resultXY = new List<KeyValuePair<string, string>>(); //Dictionary<string, string>();
+            var resultClosed = new List<KeyValuePair<string, string>>();
+            var resultOpen = new List<KeyValuePair<string, string>>();
             foreach (var z in zLookup)
             {
                 var zData = data.Where(c => c.Z == z.Value).ToList();
                 var zParts = z.Key.Split('.');
-                var baz = new Dictionary<string,List<string>>();
+                var baz = new Dictionary<string, List<string>>();
                 #region ClosedY
                 var zClosed = zData.Where(c => string.IsNullOrEmpty(c.Y)).ToList();
                 foreach (var datapoint in zClosed)
@@ -300,11 +307,11 @@ namespace Diwen.Aifmd.Tests
                     var p = contextKey.LastIndexOf('|');
                     var memberCode = contextKey.Substring(p + 1);
                     contextKey = contextKey.Remove(p);
-                    var bar = Regex.Match(contextKey, @"\[([^[]+)\]");
+                    var bar = Regex.Match(contextKey, @"\[[^[]+\]");
                     var idx = 0;
-                    if (!bar.Success || int.TryParse(bar.Captures[0].Value.TrimStart('[').TrimEnd(']'), out  idx))
+                    if (!bar.Success) // || int.TryParse(bar.Captures[0].Value.TrimStart('[').TrimEnd(']'), out idx))
                     {
-                        // Normal case or number key can go as-is
+                        // Normal x*y case
                         var ctxParts = contextKey.Split('.');
                         for (int i = 0; i < zParts.Length; i++)
                         {
@@ -313,7 +320,7 @@ namespace Diwen.Aifmd.Tests
                         contextKey = string.Join(".", ctxParts) + "." + memberCode;
                         try
                         {
-                            result0.Add(contextKey, datapoint.CellValue);
+                            resultXY.Add(new KeyValuePair<string, string>(contextKey, datapoint.CellValue));
                         }
                         catch (Exception ex)
                         {
@@ -322,32 +329,54 @@ namespace Diwen.Aifmd.Tests
                     }
                     else // "Opened" case with string key in contextvalue
                     {
-                        var k = bar.Captures[0].Value.TrimStart('[').TrimEnd(']');
+                        int alice;
+                        var kk = bar.Captures[0].Value;
+                        var k = kk.TrimStart('[').TrimEnd(']');
+
+
                         var ctxParts = contextKey.Remove(contextKey.LastIndexOf('[')).Split('.');
+
+                        var xk = cellstructure.FirstOrDefault(x => x.IsRowKey && contextKey.StartsWith(x.ContextKey.Replace(kk, string.Empty)));
+
+                        if (xk.ContextKey != null)
+                        {
+                            var xkParts = xk.ContextKey.Split('.');
+                            for (int i = 0; i < xkParts.Length; i++)
+                            {
+                                ctxParts[i] = xkParts[i];
+                            }
+                        }
+
                         for (int i = 0; i < zParts.Length; i++)
                         {
                             ctxParts[i] = zParts[i];
                         }
-                        contextKey = string.Join(".", ctxParts); //+ "." + memberCode;
-                        List<string> a0;
-                        if (!baz.TryGetValue(contextKey, out a0))
+                        contextKey = string.Join(".", ctxParts);
+
+                        contextKey += "." + memberCode;
+
+                        if (!int.TryParse(k, out alice))
                         {
-                            a0 = new List<string>();
-                            a0.Add(k);
-                            baz.Add(contextKey, a0);
+                            List<string> a0;
+                            if (!baz.TryGetValue(contextKey, out a0))
+                            {
+                                a0 = new List<string>();
+                                a0.Add(k);
+                                baz.Add(contextKey, a0);
+                            }
+
+                            alice = a0.IndexOf(k) + 1;
+                            if (alice == 0)
+                            {
+                                a0.Add(k);
+                                alice = a0.Count;
+                            }
+                            contextKey = contextKey.Replace(kk, "[" + alice.ToString() + "]");
                         }
 
-                        var alice = a0.IndexOf(k) + 1;
-                        if (alice == 0)
-                        {
-                            a0.Add(k);
-                            alice = a0.Count;
-                        }
-
-                        contextKey += "[" + alice + "]" + "." + memberCode;
                         try
                         {
-                            result1.Add(contextKey, datapoint.CellValue);
+                            resultClosed.Add(new KeyValuePair<string, string>(contextKey, datapoint.CellValue));
                         }
                         catch (Exception ex)
                         {
@@ -392,7 +421,7 @@ namespace Diwen.Aifmd.Tests
                             contextKey = string.Join(".", ctxParts) + "." + memberCode;
                             try
                             {
-                                result2.Add(contextKey, datapoint.CellValue);
+                                resultOpen.Add(new KeyValuePair<string, string>(contextKey, datapoint.CellValue));
                             }
                             catch (Exception ex)
                             {
@@ -401,12 +430,57 @@ namespace Diwen.Aifmd.Tests
 
                         }
                     }
-                   
+
                 }
 
                 #endregion
             }
-            return result0;
+
+            var frob = new Dictionary<string, string>();
+            foreach (var item in resultXY)
+            {
+                try
+                {
+                    frob.Add(item.Key, item.Value);
+                }
+                catch (Exception)
+                {
+
+                    Console.WriteLine(item.Key);
+                }
+
+            }
+
+
+            foreach (var item in resultOpen)
+            {
+                try
+                {
+                    frob.Add(item.Key, item.Value);
+                }
+                catch (Exception)
+                {
+
+                    Console.WriteLine(item.Key);
+                }
+
+            }
+
+            foreach (var item in resultClosed)
+            {
+                try
+                {
+                    frob.Add(item.Key, item.Value);
+                }
+                catch (Exception)
+                {
+
+                    Console.WriteLine(item.Key);
+                }
+
+            }
+
+            return frob;
         }
 
         public static Dictionary<string, string> AddAxisIndices(Dictionary<string, string> data, List<CellStructureCell> cellstructure)
@@ -516,4 +590,3 @@ namespace Diwen.Aifmd.Tests
         }
     }
 }
-
