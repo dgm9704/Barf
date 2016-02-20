@@ -427,7 +427,6 @@ namespace Diwen.Aifmd.Tests
                             {
                                 Console.WriteLine(contextKey);
                             }
-
                         }
                     }
 
