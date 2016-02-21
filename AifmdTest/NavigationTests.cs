@@ -18,7 +18,6 @@
 	using System.Xml.XPath;
 	using System.Text.RegularExpressions;
 
-
 	#if __MonoCS__
 	[TestFixture]
 	#else
