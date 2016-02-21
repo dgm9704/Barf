@@ -59,8 +59,6 @@
 
 			var dataForXml = CreateOutputData(cellData, cellStructure);
 
-			var orderedData = OrderData(dataForXml, cellStructure);
-
 			var outputReport = WriteReport(dataForXml);
 			WriteHeaders(outputReport, headers);
 
@@ -72,11 +70,6 @@
 					success = false;
 				});
 			Assert.IsTrue(success);
-		}
-
-		private Dictionary<string, string> OrderData(Dictionary<string, string> data, List<CellStructureCell> cellStructure)
-		{
-
 		}
 
 		private static XmlSchemaSet GetSchemas()
