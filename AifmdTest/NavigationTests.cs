@@ -185,8 +185,7 @@
 						{
 							node.Add(new XElement(p));
 							next = node.XPathSelectElement(part);
-						}
-						while (next == null);
+						} while (next == null);
 					}
 					else
 					{
@@ -208,7 +207,7 @@
 			foreach (var line in contents.Skip(1))
 			{
 				var record = line.Split(',');
-				result.Add(new CellStructureCell(record[0], record[1], XmlConvert.ToBoolean(record[2].ToLower()), record[3]));
+				result.Add(new CellStructureCell(record[0], record[1], record[2], XmlConvert.ToBoolean(record[3].ToLower()), record[4]));
 			}
 			return result;
 		}
@@ -304,15 +303,35 @@
 			return match;
 		}
 
+		public struct RawDataItem
+		{
+			public string ContextKey { get; }
+
+			public string CName { get; }
+
+			public string Value { get; }
+
+			public RawDataItem(string contextKey, string cname, string value)
+			{
+				this.ContextKey = contextKey;
+				this.CName = cname;
+				this.Value = value;
+			}
+
+			public override string ToString()
+			{
+				return string.Format("[RawDataItem: ContextKey={0}, CName={1}, Value={2}]", ContextKey, CName, Value);
+			}
+		}
+
 		public static Dictionary<string, string> CreateRawData(
 			List<CellDatabaseCell> data,
 			List<CellStructureCell> cellstructure,
 			Dictionary<string, string> zLookup)
 		{
 			var rowKeys = cellstructure.Where(c => c.IsRowKey && string.IsNullOrEmpty(c.DefaultValue)).ToList();
-			var resultXY = new List<KeyValuePair<string, string>>(); //Dictionary<string, string>();
-			var resultClosed = new List<KeyValuePair<string, string>>();
-			var resultOpen = new List<KeyValuePair<string, string>>();
+			var result = new Dictionary<string, string>();
+			var rawData = new List<RawDataItem>();
 			foreach (var z in zLookup)
 			{
 				var zData = data.Where(c => c.Z == z.Value).ToList();
@@ -345,6 +364,9 @@
 							var p = contextKey.LastIndexOf('|');
 							var memberCode = contextKey.Substring(p + 1);
 							contextKey = contextKey.Remove(p);
+
+							var cname = cellstructure.FirstOrDefault(c => c.ContextKey == contextKey && c.MemberCode == memberCode).CName;
+
 							var ctxParts = contextKey.Split('.');
 
 							for (int i = 0; i < foos.Length; i++)
@@ -352,14 +374,10 @@
 								ctxParts[i] = foos[i];
 							}
 							contextKey = string.Join(".", ctxParts) + "." + memberCode;
-							try
-							{
-								resultOpen.Add(new KeyValuePair<string, string>(contextKey, datapoint.CellValue));
-							}
-							catch (Exception ex)
-							{
-								Console.WriteLine(contextKey);
-							}
+
+							var item = new RawDataItem(contextKey, cname, datapoint.CellValue);
+							rawData.Add(item);
+
 						}
 					}
 				}
@@ -374,11 +392,13 @@
 					var p = contextKey.LastIndexOf('|');
 					var memberCode = contextKey.Substring(p + 1);
 					contextKey = contextKey.Remove(p);
+
+					var cname = cellstructure.FirstOrDefault(c => c.ContextKey == contextKey && c.MemberCode == memberCode).CName;
 					var bar = Regex.Match(contextKey, @"\[[^[]+\]");
 					var idx = 0;
 
-					if (bar.Success) // "Opened" case with string key in contextvalue
-					{
+					if (bar.Success)
+					{ // "Opened" case with string key in contextvalue
 						int alice;
 						var kk = bar.Captures[0].Value;
 						var k = kk.TrimStart('[').TrimEnd(']');
@@ -424,16 +444,10 @@
 							contextKey = contextKey.Replace(kk, "[" + alice.ToString() + "]");
 						}
 
-						try
-						{
-							resultClosed.Add(new KeyValuePair<string, string>(contextKey, datapoint.CellValue));
-						}
-						catch (Exception ex)
-						{
-							Console.WriteLine(contextKey);
-						}
+						var item = new RawDataItem(contextKey, cname, datapoint.CellValue);
+						rawData.Add(item);
 					}
-					else // || int.TryParse(bar.Captures[0].Value.TrimStart('[').TrimEnd(']'), out idx))
+					else
 					{
 						// Normal x*y case
 						var ctxParts = contextKey.Split('.');
@@ -442,63 +456,27 @@
 							ctxParts[i] = zParts[i];
 						}
 						contextKey = string.Join(".", ctxParts) + "." + memberCode;
-						try
-						{
-							resultXY.Add(new KeyValuePair<string, string>(contextKey, datapoint.CellValue));
-						}
-						catch (Exception ex)
-						{
-							Console.WriteLine(contextKey);
-						}
+
+						var item = new RawDataItem(contextKey, cname, datapoint.CellValue);
+						rawData.Add(item);
 					}
 				}
 				#endregion
 			}
-
-			var frob = new Dictionary<string, string>();
-
-			foreach (var item in resultOpen)
+			foreach (var item in rawData.Distinct().OrderBy(d => d.CName))
 			{
-				try
+				if (!result.ContainsKey(item.ContextKey))
 				{
-					frob.Add(item.Key, item.Value);
+					result.Add(item.ContextKey, item.Value);
 				}
-				catch (Exception)
+				else
 				{
-
-					Console.WriteLine(item.Key);
+					Console.WriteLine(item);
 				}
 
 			}
 
-			foreach (var item in resultClosed)
-			{
-				try
-				{
-					frob.Add(item.Key, item.Value);
-				}
-				catch (Exception)
-				{
-
-					Console.WriteLine(item.Key);
-				}
-
-			}
-
-			foreach (var item in resultXY)
-			{
-				try
-				{
-					frob.Add(item.Key, item.Value);
-				}
-				catch (Exception)
-				{
-
-					Console.WriteLine(item.Key);
-				}
-
-			}
-			return frob;
+			return result;
 		}
 
 		public static Dictionary<string, string> CreateRawData(Dictionary<string, string> data, List<CellStructureCell> cellstructure)
@@ -567,16 +545,19 @@
 
 		public struct CellStructureCell
 		{
-			public string ContextKey { get; set; }
+			public string CName { get ; }
 
-			public string MemberCode { get; set; }
+			public string ContextKey { get; }
 
-			public bool IsRowKey { get; set; }
+			public string MemberCode { get; }
 
-			public string DefaultValue { get; set; }
+			public bool IsRowKey { get; }
 
-			public CellStructureCell(string contextKey, string memberCode, bool isRowKey, string defaultValue)
+			public string DefaultValue { get; }
+
+			public CellStructureCell(string cname, string contextKey, string memberCode, bool isRowKey, string defaultValue)
 			{
+				this.CName = cname;
 				this.ContextKey = contextKey;
 				this.MemberCode = memberCode;
 				this.IsRowKey = isRowKey;
@@ -586,17 +567,17 @@
 
 		public struct CellDatabaseCell
 		{
-			public string ContextKey { get; set; }
+			public string ContextKey { get; }
 
-			public string X { get; set; }
+			public string X { get; }
 
-			public string Y { get; set; }
+			public string Y { get; }
 
-			public string Z { get; set; }
+			public string Z { get; }
 
-			public string CellValue { get; set; }
+			public string CellValue { get; }
 
-			public int RowNumber { get; set; }
+			public int RowNumber { get; }
 
 			public CellDatabaseCell(string contextKey, string x, string y, string z, string cellValue, int rownumber)
 			{
