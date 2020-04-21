@@ -9,7 +9,7 @@ namespace Diwen.Aifmd.Tests
     using System;
     using System.Xml.XPath;
     using System.Text.RegularExpressions;
-    using xUnit;
+    using Xunit;
 
     public class NavigationTests
     {
@@ -31,7 +31,7 @@ namespace Diwen.Aifmd.Tests
                     success = false;
                 });
 
-            Assert.IsTrue(success);
+            Assert.True(success);
 
             var headers = ReadHeaders(inputReport);
 
@@ -53,7 +53,7 @@ namespace Diwen.Aifmd.Tests
                     Console.WriteLine("{0}", e.Message);
                     success = false;
                 });
-            Assert.IsTrue(success);
+            Assert.True(success);
         }
 
         private static XmlSchemaSet GetSchemas()
@@ -379,7 +379,7 @@ namespace Diwen.Aifmd.Tests
 
                     var cname = cellstructure.FirstOrDefault(c => c.ContextKey == contextKey && c.MemberCode == memberCode).CName;
                     var bar = Regex.Match(contextKey, @"\[[^[]+\]");
-                    var idx = 0;
+                    //var idx = 0;
 
                     if (bar.Success)
                     { // "Opened" case with string key in contextvalue
