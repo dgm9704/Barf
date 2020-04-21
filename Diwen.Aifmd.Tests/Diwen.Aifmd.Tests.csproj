@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netcoreapp3.1</TargetFramework>
+
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.5.0" />
+    <PackageReference Include="xunit" Version="2.4.0" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.4.0" />
+    <PackageReference Include="coverlet.collector" Version="1.2.0" />
+  </ItemGroup>
+
+  <!-- <ItemGroup>
+    <Content Include="data\AIFMD_DATAIF_V1.2.xsd" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="data\AIFMD_DATMAN_V1.2.xsd" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="data\AIFMD_REPORTING_DataTypes_V1.2.xsd" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="data\AIFMSample.xml" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="data\AIFSample.xml" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="ata\CellStructure.csv" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup> -->
+
+</Project>
